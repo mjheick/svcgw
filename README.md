@@ -87,6 +87,13 @@ sub vcl_recv {
 }
 ```
 
+and a custom ExecStart in /usr/lib/systemd/system/varnish.service
+```
+...stuff...
+ExecStart=/usr/sbin/varnishd -a :80 -f /etc/varnish/service.vcl -s malloc,256m
+...stuff...
+```
+
 ## Testing Varnish
 ```
 curl -XNERD -H'Host: service.gw' http://localhost/1/flubs
