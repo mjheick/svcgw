@@ -1,4 +1,4 @@
-# svcgw - Service Gateway
+# Service Gateway
 A readme on me making a Varnish service gateway
 
 # The "Service"
@@ -41,10 +41,73 @@ echo json_encode([
 ]);
 ```
 
-## Testing
+## Testing "Service"
 ```
 curl -XPUT -H'Host: service' http://127.0.0.1:4080/1/derp/test
 {"method":"PUT","data":"1\/derp\/test"}
 ```
 
-# Varnish Configuration
+## Varnish Configuration
+```
+varnishd (varnish-6.6.2 revision 17c51b08e037fc8533fb3687a042a867235fc72f)
+Copyright (c) 2006 Verdens Gang AS
+Copyright (c) 2006-2020 Varnish Software
+```
+
+Installed and created a custom /etc/varnish/service.vcl
+```
+vcl 4.1;
+import directors;
+
+# Define a backend
+backend service_01_4080 {
+    .host = "192.168.1.108";
+    .port = "4080";
+    .max_connections = 200;
+    .connect_timeout = 5s;
+    .probe = {
+        .url = "/";
+        .timeout = 1s;
+        .interval = 5s;
+        .window = 5;
+        .threshold = 3;
+    }
+}
+backend service_02_4080 {
+    .host = "192.168.2.108";
+    .port = "4080";
+    .max_connections = 200;
+    .connect_timeout = 5s;
+    .probe = {
+        .url = "/";
+        .timeout = 1s;
+        .interval = 5s;
+        .window = 5;
+        .threshold = 3;
+    }
+}
+
+sub vcl_init {
+    new dir_service_4080 = directors.random();
+    dir_service_4080.add_backend(service_01_4080, 1);
+    dir_service_4080.add_backend(service_02_4080, 1);
+}
+
+sub vcl_recv {
+    # unset all cookies
+    unset req.http.cookie;
+    unset req.http.authorization;
+
+    # If the inbound hostname
+    if (req.http.Host ~ "service.gw") {
+        set req.http.Host = "service";
+        set req.backend_hint = dir_service_4080.backend();
+    }
+}
+```
+
+## Testing Service Gateway
+```
+curl -XNERD -H'Host: service.gw' http://localhost/1/flubs
+{"method":"NERD","data":"1\/flubs"}
+```
